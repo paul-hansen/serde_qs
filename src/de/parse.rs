@@ -273,7 +273,7 @@ impl<'a> Parser<'a> {
 
     /// In some ways the main way to use a `Parser`, this runs the parsing step
     /// and outputs a simple `Deserializer` over the parsed map.
-    pub(crate) fn as_deserializer(&mut self) -> Result<QsDeserializer<'a>> {
+    pub(crate) fn as_deserializer(&mut self) -> Result<Deserializer<'a>> {
         let map = BTreeMap::default();
         let mut root = Level::Nested(map);
 
@@ -283,7 +283,7 @@ impl<'a> Parser<'a> {
             Level::Nested(map) => map.into_iter(),
             _ => BTreeMap::default().into_iter(),
         };
-        Ok(QsDeserializer { iter, value: None })
+        Ok(Deserializer { iter, value: None })
     }
 
     /// This is the top level parsing function. It checks the first character to

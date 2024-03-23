@@ -109,7 +109,7 @@ impl Config {
 impl Config {
     /// Deserializes a querystring from a `&[u8]` using this `Config`.
     pub fn deserialize_bytes<'de, T: de::Deserialize<'de>>(&self, input: &'de [u8]) -> Result<T> {
-        T::deserialize(QsDeserializer::with_config(self, input)?)
+        T::deserialize(Deserializer::with_config(self, input)?)
     }
 
     // pub fn deserialize_bytes_sloppy<T: de::DeserializeOwned>(&self, input: &[u8])
@@ -189,7 +189,7 @@ pub fn from_str<'de, T: de::Deserialize<'de>>(input: &'de str) -> Result<T> {
 /// A deserializer for the querystring format.
 ///
 /// Supported top-level outputs are structs and maps.
-pub(crate) struct QsDeserializer<'a> {
+pub struct Deserializer<'a> {
     iter: IntoIter<Cow<'a, str>, Level<'a>>,
     value: Option<Level<'a>>,
 }
@@ -204,21 +204,21 @@ enum Level<'a> {
     Uninitialised,
 }
 
-impl<'a> QsDeserializer<'a> {
+impl<'a> Deserializer<'a> {
     fn with_map(map: BTreeMap<Cow<'a, str>, Level<'a>>) -> Self {
-        QsDeserializer {
+        Deserializer {
             iter: map.into_iter(),
             value: None,
         }
     }
 
     /// Returns a new `QsDeserializer<'a>`.
-    fn with_config(config: &Config, input: &'a [u8]) -> Result<Self> {
+    pub fn with_config(config: &Config, input: &'a [u8]) -> Result<Self> {
         parse::Parser::new(input, config.max_depth(), config.strict).as_deserializer()
     }
 }
 
-impl<'de> de::Deserializer<'de> for QsDeserializer<'de> {
+impl<'de> de::Deserializer<'de> for Deserializer<'de> {
     type Error = Error;
 
     fn deserialize_any<V>(mut self, visitor: V) -> Result<V::Value>
@@ -330,7 +330,7 @@ impl<'de> de::Deserializer<'de> for QsDeserializer<'de> {
     }
 }
 
-impl<'de> de::MapAccess<'de> for QsDeserializer<'de> {
+impl<'de> de::MapAccess<'de> for Deserializer<'de> {
     type Error = Error;
 
     fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>>
@@ -370,7 +370,7 @@ impl<'de> de::MapAccess<'de> for QsDeserializer<'de> {
     }
 }
 
-impl<'de> de::EnumAccess<'de> for QsDeserializer<'de> {
+impl<'de> de::EnumAccess<'de> for Deserializer<'de> {
     type Error = Error;
     type Variant = Self;
 
@@ -387,7 +387,7 @@ impl<'de> de::EnumAccess<'de> for QsDeserializer<'de> {
     }
 }
 
-impl<'de> de::VariantAccess<'de> for QsDeserializer<'de> {
+impl<'de> de::VariantAccess<'de> for Deserializer<'de> {
     type Error = Error;
     fn unit_variant(self) -> Result<()> {
         Ok(())
@@ -525,10 +525,10 @@ macro_rules! deserialize_primitive {
 }
 
 impl<'a> LevelDeserializer<'a> {
-    fn into_deserializer(self) -> Result<QsDeserializer<'a>> {
+    fn into_deserializer(self) -> Result<Deserializer<'a>> {
         match self.0 {
-            Level::Nested(map) => Ok(QsDeserializer::with_map(map)),
-            Level::OrderedSeq(map) => Ok(QsDeserializer::with_map(
+            Level::Nested(map) => Ok(Deserializer::with_map(map)),
+            Level::OrderedSeq(map) => Ok(Deserializer::with_map(
                 map.into_iter()
                     .map(|(k, v)| (Cow::Owned(k.to_string()), v))
                     .collect(),
@@ -597,7 +597,7 @@ impl<'de> de::Deserializer<'de> for LevelDeserializer<'de> {
     {
         match self.0 {
             Level::Nested(map) => {
-                QsDeserializer::with_map(map).deserialize_enum(name, variants, visitor)
+                Deserializer::with_map(map).deserialize_enum(name, variants, visitor)
             }
             Level::Flat(_) => visitor.visit_enum(self),
             x => Err(de::Error::custom(format!(
